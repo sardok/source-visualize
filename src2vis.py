@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+
+#
+# Author: Sinan Nalkaya <sardok@gmail.com>
+# See LICENSE file.
+#
+
 import sys
 import networkx as nx
 from re import match
@@ -8,23 +14,28 @@ from os.path import basename, isfile
 def create_graph(syms):
     graph = nx.Graph()
 
-    for key1 in syms.keys():
-        graph.add_node(key1)
-        for key2 in syms[key1].keys():
-            graph.add_node(key2)
-            graph.add_edge(key1, key2)
+    for file in syms.keys():
+        graph.add_node(file)
+        funcs = syms[file]['defs'].keys()
+        print 'funcs of ' + file
+        print funcs
+        paired = [(file, x) for x in funcs]
+        graph.add_edges_from(paired)
+        # for func in syms[file]['defs'].keys():
+        #     graph.add_node(func)
+        #     graph.add_edge(file, func)
     
     # Add Cross references
-    for key1 in syms.keys():
-        for key2 in syms[key1].keys():
-            for xref in syms[key1][key2]:
-                graph.add_edge(key2, xref)
+    # for file in syms.keys():
+    #     for func in syms[file]['defs'].keys():
+    #         for xref in syms[file]['defs'][func]:
+    #             graph.add_edge(func, xref)
     
     return graph
 
 def create_symbol_table(input_file):
     syms = {}
-    db = { 'file':'', 'func':'', 'xref':'' }
+    cscope_line = { 'file':'', 'func':'', 'xref':'' }
 
     def cscope_line_parser(item, regex):
         def parser(line):
@@ -32,20 +43,26 @@ def create_symbol_table(input_file):
             if m: return item, m.groups()[0]
         return parser
 
-    def insert(db):
-        key1 = db['file']
-        if not key1: return
-        if not syms.has_key(key1): syms[key1] = {}
-        
-        key2 = db['func']
-        if not key2: return
-        if not syms[key1].has_key(key2): syms[key1][key2] = set([])
+    def insert(cscope_line):
+        file = cscope_line['file']
+        if not file: return
+        if not syms.has_key(file):
+            syms[file] = {'lines':0, 'defs':{}}
+            return
 
-        key3 = db['xref']
-        if not key3: return
-        if not key3 in syms[key1][key2]: syms[key1][key2].add(key3)
-    
-    parsers = [cscope_line_parser('file', '\s@(.*)'),
+        syms[file]['lines'] += 1
+        func = cscope_line['func']
+        if not func: return
+        if not syms[file]['defs'].has_key(func):
+            syms[file]['defs'][func] = set([])
+            return
+
+        xref = cscope_line['xref']
+        if not xref: return
+        if not xref in syms[file]['defs'][func]:
+            syms[file]['defs'][func].add(xref)
+
+    parsers = [cscope_line_parser('file', '\s@(.*\.[ch])'),
                cscope_line_parser('func', '\s\$(.*)'),
                cscope_line_parser('xref', '\s\`(.*)')]
 
@@ -58,11 +75,9 @@ def create_symbol_table(input_file):
             if parser:
                 func = parser[0]
                 key, val = func(line)
-                db[key] = val
-                insert(db)
-                #graph.add_node(db['func'], packet=db['file'])
-                # Remove inserted entry
-        #             graph.add_edge(xref, fnc)
+                cscope_line[key] = val
+                insert(cscope_line)
+
     return syms
     
 if __name__ == '__main__':
