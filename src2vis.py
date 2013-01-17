@@ -34,38 +34,51 @@ def create_graph(syms):
     return graph
 
 def create_symbol_table(input_file):
-    syms = {}
+    sym_table = {}
     cscope_line = { 'file':'', 'func':'', 'xref':'' }
 
-    def cscope_line_parser(item, regex):
+    def cscope_line_validator(item, regex):
         def parser(line):
             m = match(regex, line)
             if m: return item, m.groups()[0]
         return parser
 
+    def file_tag_parser(entry):
+        for dir in entry.split('\\'):
+            sym_table[dir] = {}
+
+    def func_tag_parser(entry):
+        return 1
+
+    def xref_tag_parser(entry):
+        return 1
+
     def insert(cscope_line):
         file = cscope_line['file']
         if not file: return
-        if not syms.has_key(file):
-            syms[file] = {'lines':0, 'defs':{}}
+        if not sym_table.has_key(file):
+            sym_table[file] = {'lines':0, 'defs':{}}
             return
 
-        syms[file]['lines'] += 1
+        sym_table[file]['lines'] += 1
         func = cscope_line['func']
         if not func: return
-        if not syms[file]['defs'].has_key(func):
-            syms[file]['defs'][func] = set([])
+        if not sym_table[file]['defs'].has_key(func):
+            sym_table[file]['defs'][func] = set([])
             return
 
         xref = cscope_line['xref']
         if not xref: return
-        if not xref in syms[file]['defs'][func]:
-            syms[file]['defs'][func].add(xref)
+        if not xref in sym_table[file]['defs'][func]:
+            sym_table[file]['defs'][func].add(xref)
 
-    parsers = [cscope_line_parser('file', '\s@(.*\.[ch])'),
-               cscope_line_parser('func', '\s\$(.*)'),
-               cscope_line_parser('xref', '\s\`(.*)')]
+    validators = [cscope_line_validator('file', '\s@(.*\.[ch])'),
+                  cscope_line_validator('func', '\s\$(.*)'),
+                  cscope_line_validator('xref', '\s\`(.*)')]
 
+    parsers = {'file':file_tag_parser, 'func':func_tag_parser,
+               'xref':xref_tag_parser}
+    
     with open(input_file) as f:
         sym = None
 
@@ -74,11 +87,10 @@ def create_symbol_table(input_file):
             parser = filter(lambda x: x(line), parsers)
             if parser:
                 func = parser[0]
-                key, val = func(line)
-                cscope_line[key] = val
-                insert(cscope_line)
-
-    return syms
+                key, entry = func(line)
+                parsers[key](entry)
+                
+    return sym_table
     
 if __name__ == '__main__':
     cscope_file = sys.argv[1]
