@@ -16,7 +16,6 @@ def create_graph(syms_table):
     graph = nx.Graph()
 
     def iterate_table(entry, parent=None):
-        print entry
         for key in entry:
             if key == 'weight':
                 continue
@@ -108,9 +107,9 @@ def create_symbol_table(input_file):
             if m: return item, m.groups()[0]
         return parser
 
-    # This function is called likely every on
-    # iteration and keeps updating 'weight' of
-    # each source file.
+    # This function is called on every iteration
+    # and  increments 'weight' for each of source
+    # file.
     def update_weights():
         refs = []
         for ref in cur_refs['index']:
@@ -137,7 +136,6 @@ def create_symbol_table(input_file):
                 parsers[key](entry)
 
             update_weights()
-    #print sym_table
     return sym_table
     
 if __name__ == '__main__':
@@ -148,14 +146,21 @@ if __name__ == '__main__':
 #    for node in graph.nodes(data=True):
 #        print node
 #    print graph.nodes(data=True)
-    print [(d['weight'], d['label']) for (n,d) in graph.nodes(data=True)]
-    #print nodesize
-    #print labels
-    exit(9)
+
+    def get_data(seq):
+        total = 0
+        for (n,v) in seq:
+            total += 1
+            yield(v['weight'], {total:v['label']})
+    nodedata = get_data(graph.nodes(data=True))
+    nodedata = [data for data in nodedata]
+    nodesize = [size for (size, label) in nodedata]
+    nodelabel = [label for (size, label) in nodedata]
+    nodelabel = dict(nodelabel)
     nx.draw_networkx_nodes(graph, pos, node_size=nodesize, node_color='w', alpha=0.4)
-    nx.draw_networkx_labels(graph, pos, labels, font_size=16)
-    plt.figure(figsize=(8,8))
-    plt.axis('off')
+    nx.draw_networkx_labels(graph, pos, nodelabel, font_size=16)
+    # plt.figure(figsize=(8,8))
+    # plt.axis('off')
     #plt.savefig("chess_masters.png",dpi=75)
     #print("Wrote chess_masters.png")
     plt.show() # display
