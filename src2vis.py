@@ -22,7 +22,9 @@ def create_graph(syms_table):
             if not (isinstance(entry[key], dict) and \
                         entry[key].has_key('weight')):
                 continue
-            graph.add_node(key, {'weight':entry[key]['weight'],'label':key})
+            graph.add_node(key, {\
+                    'weight':entry[key]['weight'],\
+                        'label':'%s:%d' % (key,entry[key]['weight'])})
             if parent:
                 graph.add_edge(parent, key)
             iterate_table(entry[key], key)
@@ -143,26 +145,15 @@ if __name__ == '__main__':
     symbols = create_symbol_table(cscope_file)
     graph = create_graph(symbols)
     pos = nx.graphviz_layout(graph)
-#    for node in graph.nodes(data=True):
-#        print node
-#    print graph.nodes(data=True)
-
-    def get_data(seq):
-        total = 0
-        for (n,v) in seq:
-            total += 1
-            yield(v['weight'], {total:v['label']})
-    nodedata = get_data(graph.nodes(data=True))
-    nodedata = [data for data in nodedata]
-    nodesize = [size for (size, label) in nodedata]
-    nodelabel = [label for (size, label) in nodedata]
-    nodelabel = dict(nodelabel)
-    nx.draw_networkx_nodes(graph, pos, node_size=nodesize, node_color='w', alpha=0.4)
-    nx.draw_networkx_labels(graph, pos, nodelabel, font_size=16)
-    # plt.figure(figsize=(8,8))
-    # plt.axis('off')
-    #plt.savefig("chess_masters.png",dpi=75)
-    #print("Wrote chess_masters.png")
+    nodedata = [(v['weight'], {n:v['label']}) for (n,v) in graph.nodes(data=True)]
+    nodelabels={}
+    nodeweights=[]
+    for weight, label in nodedata:
+        nodeweights.append(weight)
+        nodelabels.update(label)
+    nx.draw_networkx_nodes(graph, pos, node_size=nodeweights, node_color='w', alpha=0.4)
+    nx.draw_networkx_labels(graph, pos, nodelabels)
+    nx.draw_networkx_edges(graph, pos)
     plt.show() # display
     # output = basename(getcwd()) + '.gml'
     # if isfile(output):
