@@ -12,10 +12,63 @@ from os.path import basename, isfile
 import networkx as nx
 import matplotlib.pyplot as plt
 
-def create_graph(syms_table):
-    graph = nx.Graph()
+def draw_graph(graph):
+    nodedata = [(v['weight'], {n:v['label']}) for (n,v) in graph.nodes(data=True)]
+    nodelabels={}
+    nodeweights=[]
+    for weight, label in nodedata:
+        nodeweights.append(weight)
+        nodelabels.update(label)
+    # maxweight = max(nodeweights)
+    # minweight = min(nodeweights)
+    # ratio = maxweight/minweight
+    # nodeweights = map(lambda x: x/ratio, nodeweights)
+    #pos = nx.random_layout(graph)
+    pos = nx.fruchterman_reingold_layout(graph)
+    nx.draw_networkx_nodes(graph, pos, node_size=nodeweights, node_color='w', alpha=0.4)
+    nx.draw_networkx_labels(graph, pos, nodelabels)
+    nx.draw_networkx_edges(graph, pos)
+    output = basename(getcwd()) + '.gml'
+    if isfile(output):
+        remove(output)
+    nx.write_gml(graph, output)
+    plt.show() # display
 
-    def iterate_table(entry, parent=None):
+    
+def create_graph(syms_table):
+    graph = nx.DiGraph()
+
+    def find_by_func(entry, func, parent=None):
+        if not isinstance(entry, dict):
+            return
+        if entry.has_key(func):
+            return parent
+        for item in entry:
+            ret = find_by_func(entry[item], func, item)
+            if ret: return ret
+        
+    def create_edge(entry, parent=None):
+        for key in entry:
+            if graph.has_node(key):
+                # It is a graph node rather than function
+                create_edge(entry[key], key)
+            else:
+                # The key may not be an iterable
+                # for example 'weight'
+                try:
+                    # this key is a function definition
+                    for xref in entry[key]:
+                        to = find_by_func(syms_table, xref)
+                        if parent and to and graph.has_node(to) \
+                                and parent != to:
+                            if graph.has_edge(parent, to):
+                                graph[parent][to]['weight'] += 1
+                            else:
+                                graph.add_edge(parent, to, {'weight':1})
+                except TypeError:
+                    pass
+                
+    def create_node(entry, parent=None):
         for key in entry:
             if key == 'weight':
                 continue
@@ -25,11 +78,12 @@ def create_graph(syms_table):
             graph.add_node(key, {\
                     'weight':entry[key]['weight'],\
                         'label':'%s:%d' % (key,entry[key]['weight'])})
-            if parent:
-                graph.add_edge(parent, key)
-            iterate_table(entry[key], key)
+            #if parent:
+            #    graph.add_edge(parent, key)
+            create_node(entry[key], key)
             
-    iterate_table(syms_table)
+    create_node(syms_table)
+    create_edge(syms_table)
     return graph
 
 def create_symbol_table(input_file):
@@ -78,11 +132,15 @@ def create_symbol_table(input_file):
         db.update(dict_merge(db, {'weight':0}))
         
     def file_tag_parser(entry):
-        entries = entry.split('/')
-        entries = filter(lambda x: x != '', entries)
+        # entries = entry.split('/')
+        # entries = filter(lambda x: x != '', entries)
+        # cur_refs['index'] = deepcopy(entries)
+        # cur_refs['func'] = ''
+        # entries.reverse()
+        entries = [entry]
         cur_refs['index'] = deepcopy(entries)
         cur_refs['func'] = ''
-        entries.reverse()
+        
         tmp = {}
         for dir in entries:
             add_weight(tmp)
@@ -144,18 +202,6 @@ if __name__ == '__main__':
     cscope_file = sys.argv[1]
     symbols = create_symbol_table(cscope_file)
     graph = create_graph(symbols)
-    pos = nx.graphviz_layout(graph)
-    nodedata = [(v['weight'], {n:v['label']}) for (n,v) in graph.nodes(data=True)]
-    nodelabels={}
-    nodeweights=[]
-    for weight, label in nodedata:
-        nodeweights.append(weight)
-        nodelabels.update(label)
-    nx.draw_networkx_nodes(graph, pos, node_size=nodeweights, node_color='w', alpha=0.4)
-    nx.draw_networkx_labels(graph, pos, nodelabels)
-    nx.draw_networkx_edges(graph, pos)
-    plt.show() # display
-    # output = basename(getcwd()) + '.gml'
-    # if isfile(output):
-    #     remove(output)
-    # nx.write_gml(graph, output)
+    print graph.nodes()
+    print graph.edges(data=True)
+    draw_graph(graph)
